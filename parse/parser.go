@@ -15,7 +15,7 @@ type Result struct {
 	Keys map[int]string
 }
 
-func FromURL(link string) (*Result, error) {
+func FromURL(link, encryptedVideoKey string) (*Result, error) {
 	u, err := url.Parse(link)
 	if err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func FromURL(link string) (*Result, error) {
 	}
 	if len(m3u8.MasterPlaylist) != 0 {
 		sf := m3u8.MasterPlaylist[0]
-		return FromURL(tool.ResolveURL(u, sf.URI))
+		return FromURL(tool.ResolveURL(u, sf.URI), encryptedVideoKey)
 	}
 	if len(m3u8.Segments) == 0 {
 		return nil, errors.New("can not found any TS file description")
@@ -49,6 +49,10 @@ func FromURL(link string) (*Result, error) {
 		case key.Method == "" || key.Method == CryptMethodNONE:
 			continue
 		case key.Method == CryptMethodAES:
+			if encryptedVideoKey != "" {
+				result.Keys[idx] = encryptedVideoKey
+				continue
+			}
 			// Request URL to extract decryption key
 			keyURL := key.URI
 			keyURL = tool.ResolveURL(u, keyURL)

@@ -209,7 +209,7 @@ func parse(reader io.Reader) (*M3u8, error) {
 			key = new(Key)
 			key.Method = method
 			key.URI = params["URI"]
-			key.IV = params["IV"]
+			key.IV = strings.TrimPrefix(params["IV"], "0x")
 			m3u8.Keys[keyIndex] = key
 		case line == "#EndList":
 			m3u8.EndList = true

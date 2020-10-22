@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 	"sync"
 	"sync/atomic"
 
@@ -34,8 +33,8 @@ type Downloader struct {
 }
 
 // NewTask returns a Task instance
-func NewTask(output string, url string) (*Downloader, error) {
-	result, err := parse.FromURL(url)
+func NewTask(output string, url string, encryptedVideoKey string) (*Downloader, error) {
+	result, err := parse.FromURL(url, encryptedVideoKey)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +67,7 @@ func NewTask(output string, url string) (*Downloader, error) {
 }
 
 // Start runs downloader
-func (d *Downloader) Start(concurrency int) error {
+func (d *Downloader) Start(concurrency int, enableMerge bool) error {
 	var wg sync.WaitGroup
 	// struct{} zero size
 	limitChan := make(chan struct{}, concurrency)
@@ -95,14 +94,16 @@ func (d *Downloader) Start(concurrency int) error {
 		limitChan <- struct{}{}
 	}
 	wg.Wait()
-	if err := d.merge(); err != nil {
-		return err
+	if enableMerge {
+		if err := d.merge(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 func (d *Downloader) download(segIndex int) error {
-	tsFilename := tsFilename(segIndex)
+	tsFilename := d.tsFilename(segIndex)
 	tsUrl := d.tsURL(segIndex)
 	b, e := tool.Get(tsUrl)
 	if e != nil {
@@ -191,7 +192,7 @@ func (d *Downloader) merge() error {
 	// In fact, the number of downloaded segments should be equal to number of m3u8 segments
 	missingCount := 0
 	for idx := 0; idx < d.segLen; idx++ {
-		tsFilename := tsFilename(idx)
+		tsFilename := d.tsFilename(idx)
 		f := filepath.Join(d.tsFolder, tsFilename)
 		if _, err := os.Stat(f); err != nil {
 			missingCount++
@@ -213,7 +214,7 @@ func (d *Downloader) merge() error {
 	writer := bufio.NewWriter(mFile)
 	mergedCount := 0
 	for segIndex := 0; segIndex < d.segLen; segIndex++ {
-		tsFilename := tsFilename(segIndex)
+		tsFilename := d.tsFilename(segIndex)
 		bytes, err := ioutil.ReadFile(filepath.Join(d.tsFolder, tsFilename))
 		_, err = writer.Write(bytes)
 		if err != nil {
@@ -241,8 +242,10 @@ func (d *Downloader) tsURL(segIndex int) string {
 	return tool.ResolveURL(d.result.URL, seg.URI)
 }
 
-func tsFilename(ts int) string {
-	return strconv.Itoa(ts) + tsExt
+func (d *Downloader) tsFilename(segIndex int) string {
+	seg := d.result.M3u8.Segments[segIndex]
+	return seg.URI
+	//return strconv.Itoa(segIndex) + tsExt
 }
 
 func genSlice(len int) []int {

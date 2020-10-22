@@ -11,13 +11,17 @@ import (
 var (
 	url      string
 	output   string
+	encryptedVideoKey   string
 	chanSize int
+	enableMerge bool
 )
 
 func init() {
 	flag.StringVar(&url, "u", "", "M3U8 URL, required")
 	flag.IntVar(&chanSize, "c", 25, "Maximum number of occurrences")
 	flag.StringVar(&output, "o", "", "Output folder, required")
+	flag.StringVar(&encryptedVideoKey, "k", "", "encryptedVideoKey")
+	flag.BoolVar(&enableMerge, "m", true, "enableMerge")
 }
 
 func main() {
@@ -37,11 +41,11 @@ func main() {
 	if chanSize <= 0 {
 		panic("parameter 'c' must be greater than 0")
 	}
-	downloader, err := dl.NewTask(output, url)
+	downloader, err := dl.NewTask(output, url, encryptedVideoKey)
 	if err != nil {
 		panic(err)
 	}
-	if err := downloader.Start(chanSize); err != nil {
+	if err := downloader.Start(chanSize, enableMerge); err != nil {
 		panic(err)
 	}
 	fmt.Println("Done!")
